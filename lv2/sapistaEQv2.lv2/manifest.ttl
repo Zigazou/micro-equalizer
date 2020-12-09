@@ -1,0 +1,70 @@
+@prefix lv2:  <http://lv2plug.in/ns/lv2core#>.
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
+
+<http://eq10q.sourceforge.net/eq/eq1qm>
+  a lv2:Plugin;
+  rdfs:seeAlso <eq1qm.ttl>.
+
+<http://eq10q.sourceforge.net/eq/eq1qs>
+  a lv2:Plugin;
+  rdfs:seeAlso <eq1qs.ttl>.
+
+<http://eq10q.sourceforge.net/eq/eq4qm>
+  a lv2:Plugin;
+  rdfs:seeAlso <eq4qm.ttl>.
+
+<http://eq10q.sourceforge.net/eq/eq4qs>
+  a lv2:Plugin;
+  rdfs:seeAlso <eq4qs.ttl>.
+
+<http://eq10q.sourceforge.net/eq/eq6qm>
+  a lv2:Plugin;
+  rdfs:seeAlso <eq6qm.ttl>.
+
+<http://eq10q.sourceforge.net/eq/eq6qs>
+  a lv2:Plugin;
+  rdfs:seeAlso <eq6qs.ttl>.
+
+<http://eq10q.sourceforge.net/eq/eq10qm>
+  a lv2:Plugin;
+  rdfs:seeAlso <eq10qm.ttl>.
+
+<http://eq10q.sourceforge.net/eq/eq10qs>
+  a lv2:Plugin;
+  rdfs:seeAlso <eq10qs.ttl>.
+
+<http://eq10q.sourceforge.net/gate>
+  a lv2:Plugin;
+  rdfs:seeAlso <gate.ttl>.
+  
+<http://eq10q.sourceforge.net/compressor>
+  a lv2:Plugin;
+  rdfs:seeAlso <compressor.ttl>.
+  
+<http://eq10q.sourceforge.net/compressor_sc>
+  a lv2:Plugin;
+  rdfs:seeAlso <compressor_sc.ttl>.
+  
+<http://eq10q.sourceforge.net/gate_stereo>
+  a lv2:Plugin;
+  rdfs:seeAlso <gate_stereo.ttl>.
+  
+<http://eq10q.sourceforge.net/compressor_stereo>
+  a lv2:Plugin;
+  rdfs:seeAlso <compressor_stereo.ttl>.
+  
+<http://eq10q.sourceforge.net/compressor_stereo_sc>
+  a lv2:Plugin;
+  rdfs:seeAlso <compressor_stereo_sc.ttl>.
+  
+<http://eq10q.sourceforge.net/bassup>
+  a lv2:Plugin;
+  rdfs:seeAlso <bassup.ttl>.
+
+<http://eq10q.sourceforge.net/matrix_lr2ms>
+  a lv2:Plugin;
+  rdfs:seeAlso <lr2ms.ttl>.
+  
+<http://eq10q.sourceforge.net/matrix_ms2lr>
+  a lv2:Plugin;
+  rdfs:seeAlso <ms2lr.ttl>.

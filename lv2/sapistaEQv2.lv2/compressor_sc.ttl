@@ -1,0 +1,218 @@
+@prefix lv2:  <http://lv2plug.in/ns/lv2core#>.
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix doap: <http://usefulinc.com/ns/doap#>.
+@prefix guiext: <http://lv2plug.in/ns/extensions/ui#>.
+@prefix units: <http://lv2plug.in/ns/extensions/units#> .
+@prefix pprop: <http://lv2plug.in/ns/ext/port-props#> .
+
+<http://eq10q.sourceforge.net/prafols#me>
+	a foaf:Person ;
+	foaf:name "Pere Ràfols Soler" ;
+	foaf:mbox <mailto:sapista2@gmail.com> ;
+	foaf:homepage <http://eq10q.sourceforge.net> .
+
+<http://eq10q.sourceforge.net/eq10qplugins>
+	a doap:Project ;
+	doap:maintainer <http://eq10q.sourceforge.net/prafols#me> ;
+	doap:name "EQ10Q plugins" .
+
+##LV2 GUI extension
+<http://eq10q.sourceforge.net/dynamics/gui>
+  a guiext:GtkUI;
+  guiext:binary <gui/dynamics_gui.so>;
+  lv2:optionalFeature guiext:noUserResize.
+
+##LV2 plugin binary
+<http://eq10q.sourceforge.net/compressor_sc>
+  a lv2:Plugin, lv2:CompressorPlugin, doap:Project;
+  lv2:binary <compressor_sc.so>;
+  doap:name "CS10QM-SC";
+  doap:license <http://usefulinc.com/doap/licenses/gpl>;
+  lv2:optionalFeature lv2:hardRTCapable;
+  lv2:project <http://eq10q.sourceforge.net/eq10qplugins>;
+  guiext:ui <http://eq10q.sourceforge.net/dynamics/gui>;
+
+      lv2:port [
+	      a lv2:AudioPort, lv2:OutputPort;
+	      lv2:index 0;
+	      lv2:symbol "output";
+	      lv2:name "Output";
+      ],
+
+      [
+	      a lv2:AudioPort, lv2:InputPort;
+	      lv2:index 1;
+	      lv2:symbol "input";
+	      lv2:name "Input";
+      ],
+
+      [
+	      a lv2:ControlPort, lv2:InputPort;
+	      lv2:index 2;
+	      lv2:symbol "keylisten";
+	      lv2:name "Key Listen";
+	      lv2:minimum 0;
+	      lv2:maximum 1;
+	      lv2:default 0;
+	      lv2:portProperty lv2:toggled;
+      ],
+
+      [
+	      a lv2:ControlPort, lv2:InputPort;
+	      lv2:index 3;
+	      lv2:symbol "threshold";
+	      lv2:name "Threshold (dB)";
+	      lv2:minimum -46;
+	      lv2:maximum 4;
+	      lv2:default -10;
+	      units:unit units:db;
+      ],
+
+      [
+	      a lv2:ControlPort, lv2:InputPort;
+	      lv2:index 4;
+	      lv2:symbol "attack";
+	      lv2:name "Attack (ms)";
+	      lv2:minimum 0.01;
+	      lv2:maximum 500;
+	      lv2:default 10;
+      ],
+
+	      [
+	      a lv2:ControlPort, lv2:InputPort;
+	      lv2:index 5;
+	      lv2:symbol "compmakeup";
+	      lv2:name "Makeup (dB)";
+	      lv2:minimum 0;
+	      lv2:maximum 20;
+	      lv2:default 0;
+	      units:unit units:db;
+      ],
+
+      [
+	      a lv2:ControlPort, lv2:InputPort;
+	      lv2:index 6;
+	      lv2:symbol "decay";
+	      lv2:name "Decay (ms)";
+	      lv2:minimum 5;
+	      lv2:maximum 4000;
+	      lv2:default 250;
+      ],
+
+	      [
+	      a lv2:ControlPort, lv2:InputPort;
+	      lv2:index 7;
+	      lv2:symbol "compratio";
+	      lv2:name "Ratio (dB)";
+	      lv2:minimum 1;
+	      lv2:maximum 100;
+	      lv2:default 6;
+	      units:unit units:db;
+      ],
+      
+	      [
+	      a lv2:ControlPort, lv2:InputPort;
+	      lv2:index 8;
+	      lv2:symbol "hpf";
+	      lv2:name "HPF Key Filter (Hz)";
+	      lv2:minimum 20;
+	      lv2:maximum 20000;
+	      lv2:default 20;
+	      units:unit units:hz;
+	      lv2:portProperty pprop:logarithmic;
+      ],
+      
+	      [
+	      a lv2:ControlPort, lv2:InputPort;
+	      lv2:index 9;
+	      lv2:symbol "lpf";
+	      lv2:name "LPF Key Filter (Hz)";
+	      lv2:minimum 20;
+	      lv2:maximum 20000;
+	      lv2:default 20000;
+	      units:unit units:hz;
+	      lv2:portProperty pprop:logarithmic;
+      ],
+	      [
+	      a lv2:ControlPort, lv2:InputPort;
+	      lv2:index 10;
+	      lv2:symbol "ingain";
+	      lv2:name "Gain (dB)";
+	      lv2:minimum -20;
+	      lv2:maximum 20;
+	      lv2:default 0;
+	      units:unit units:db;
+      ],
+	      [
+	      a lv2:ControlPort, lv2:OutputPort;
+	      lv2:index 11;
+	      lv2:symbol "out_vu_ctl";
+	      lv2:name "Out VU CTL";
+      ],
+      
+      	      [
+	      a lv2:ControlPort, lv2:OutputPort;
+	      lv2:index 12;
+	      lv2:symbol "gateled";
+	      lv2:name "Gain Reduction";
+      ],
+      	      [
+	      a lv2:ControlPort, lv2:InputPort;
+	      lv2:index 13;
+	      lv2:symbol "knee";
+	      lv2:name "Knee (dB)";
+	      lv2:minimum 0;
+	      lv2:maximum 20;
+	      lv2:default 6;
+	      units:unit units:db;
+      ],
+      
+              [
+              a lv2:ControlPort, lv2:InputPort;
+              lv2:index 14;
+              lv2:symbol "drywet";
+              lv2:name "Dry/Wet";
+              lv2:minimum 0;
+              lv2:maximum 1;
+              lv2:default 1;
+      ],
+      
+	      [
+	      a lv2:ControlPort, lv2:InputPort;
+	      lv2:index 15;
+	      lv2:symbol "isSideChainActive";
+	      lv2:name "SideChain Active";
+	      lv2:minimum 0;
+	      lv2:maximum 1;
+	      lv2:default 0;
+	      lv2:portProperty lv2:toggled;
+      ],
+      
+             [
+	      a lv2:ControlPort, lv2:InputPort;
+	      lv2:index 16;
+	      lv2:symbol "compressorMode";
+	      lv2:name "Compressor Mode";
+	      lv2:minimum 0;
+	      lv2:maximum 1;
+	      lv2:default 0;
+	      lv2:portProperty lv2:toggled;
+      ],
+      
+	      [
+              a lv2:ControlPort, lv2:InputPort;
+              lv2:index 17;
+              lv2:symbol "punch";
+              lv2:name "Punch";
+              lv2:minimum 0;
+              lv2:maximum 1;
+              lv2:default 0;
+      ],
+      
+              [
+	      a lv2:AudioPort, lv2:InputPort;
+	      lv2:index 18;
+	      lv2:symbol "inputSC";
+	      lv2:name "InputSC";
+	      lv2:portProperty lv2:isSideChain;
+      ].     

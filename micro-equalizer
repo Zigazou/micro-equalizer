@@ -1,0 +1,555 @@
+#!/bin/bash
+# @file micro-equalizer
+# @brief Setup an equalizer and a noise reduction working in realtime for a
+# microphone
+# @description
+
+# The dialog utility. Should work with gdialog.
+DIALOG=dialog
+
+# The back title (the name of this application).
+BACKTITLE="Micro Equalizer"
+
+# The full path to the setup file
+SETUPFILE=~/.config/micro-equalizer/setup
+
+# The LV2 identifier of the equalizer plugin
+EQPLUGIN="http://eq10q.sourceforge.net/eq/eq10qs"
+
+# The LV2 identifier of the noise reduction plugin
+NRPLUGIN="https://github.com/lucianodato/noise-repellent"
+
+# Determine this script directory.
+SCRIPTDIR="$(readlink -f "${BASH_SOURCE[0]}" | xargs dirname)"
+
+# The setup file is a itself a Bash we try to load if it existes.
+[ -r "$SETUPFILE" ] && . "$SETUPFILE"
+
+# @description Assert function for Bash.
+#
+# @example
+#    assert "File not found" test -r /dev/null
+#
+# @arg $1 string The message to display if the assertion fails.
+# @arg $2 string The command to execute.
+# @arg ... any The parameters to give to the command to be executed.
+#
+# @stdout The stdout of the command executed.
+# @exitcode 0 If the assertion is validated.
+function assert() {
+    local message="$1"
+    shift
+    "$@"
+    local rc=$?
+    [ $rc -eq 0 ] && return 0
+    caller | {
+        IFS=' ' read -r line script
+        date=$(date "+%Y-%m-%d %T%z")
+        echo "$date $script [$$]: $message (line=$line, rc=$rc)" >&2
+        exit $rc
+    }
+}
+
+# @description Generate the help for this script in groff format.
+# @noargs
+# @stdout Help in groff format.
+# @exitcode 0 Should be the normal exit value.
+function generate_help() {
+    cat <<'HELP_END'
+.AM
+.TH MICRO-EQUALIZER 1 "9 December 2020"
+.SH NAME
+micro-equalizer \- Realtime equalization of microphone.
+.SH SYNOPSIS
+.B micro-equalizer
+setup
+.br
+.B micro-equalizer
+run
+.br
+.B micro-equalizer
+help
+.RI < html | man | raw >
+.br
+\fBmicro-equalizer\fP
+.SH DESCRIPTION
+\fBmicro-equalizer\fP is a Bash script which implements a realtime equalizer
+for a microphone using \fBPulseAudio\fP, \fBJack\fP, \fBEQ10Q\fP and
+\fBNoise Repellent\fP.
+
+Without any parameter, \fBmicro-equalizer\fP gives displays this help.
+
+With the \fBmicro-equalizer setup\fP form, you can configure micro-equalizer.
+
+With the \fBmicro-equalizer run\fP form, it will setup everything that needs to
+in PulseAudio and Jack.
+.SH REQUIREMENTS
+In order to use \fBmicro-equalizer\fP, the following packages need to be
+installed:
+.RS
+.IP \[bu] 2
+PulseAudio and Jack modules
+.IP \[bu] 
+Jack
+.IP \[bu] 
+LV2 CLI tools
+.RE
+
+On Debian-like distributions, these can be installed with the following
+command:
+.RS
+sudo apt install pulseaudio-module-jack jalv lv2file
+.RE
+
+.RE
+.SH "SEE ALSO"
+pulseaudio(1), jackd(1), pactl(1), pacmd(1), jack_connect(1), lv2ls(1)
+
+.UR https://github.com/Zigazou/micro-equalizer
+GitHub repository
+.UE
+.SH AUTHOR
+Written by 
+.MT zigazou@free.fr
+Fre\*[']de\*[']ric Bisson
+.ME
+.SH BUGS
+.UR https://github.com/Zigazou/micro-equalizer/issues
+Please report any problem by using the GitHub issue application of
+\fBmicro-equalizer\fP
+.UE
+HELP_END
+}
+
+# @description Show help for this script like a man page.
+# @arg $1 string Specify the output format (either raw, html or man)
+# @stdout This script's help.
+# @exitcode 0 Should be the normal exit code.
+function show_help() {
+    case "$1" in
+        raw)
+            generate_help
+            ;;
+
+        html)
+            generate_help | groff -T html -man -
+            ;;
+
+        *)
+            generate_help | groff -T utf8 -man -
+            ;;
+    esac
+}
+
+# @description Get a list of Alsa cards and devices. It uses the arecord
+# command line Alsa utility.
+# @noargs
+# @stdout 1 card/device per line, each card/device is identified with 5 fields
+# separated by a '|' in the following order : card identifier, card description,
+# device identifier, device name and device description.
+# @exitcode 0 Should be the normal exit code.
+function get_alsa_cards() {
+    LANG= arecord --list-devices \
+        | grep "^card" \
+        | sed --expression='s/^card [0-9]*: //g' \
+              --expression='s/ \[/|/g' \
+              --expression='s/], device /|/g' \
+              --expression='s/: /|/g' \
+              --expression='s/]$//g'
+}
+
+# @description Display a TUI allowing the user to interactively select an
+# available Alsa card and device.
+# @arg 1 current card/device identifier, if any
+# @stdout the selected card/device
+# @exitcode 0 if a card/device has been selected, not 0 for any other case.
+function select_alsa_card() {
+    local current="$1"
+    get_alsa_cards \
+        | while IFS='|' read -r -s hw hwdesc dv dvname dvdesc
+            do
+                if [ "$hw,$dv" == "$current" ]
+                then
+                    printf \
+                        '%s,%s "%s on %s" on\n' \
+                        "$hw" "$dv" "$hwdesc" "$dvdesc"
+                else 
+                    printf \
+                        '%s,%s "%s on %s" off\n' \
+                        "$hw" "$dv" "$hwdesc" "$dvdesc"
+                fi
+            done \
+        | xargs $DIALOG \
+            --backtitle "$BACKTITLE" \
+            --title "Setup" \
+            --no-tags \
+            --radiolist "Select a card to equalize" 0 0 8 \
+            --output-fd 1
+}
+
+# @description Display a TUI allowing the user to set the PulseAudio input name
+# as it will appear to the user when an application asks to select a device.
+# @arg 1 current PulseAudio input name, if any
+# @stdout the PulseAudio input name
+# @exitcode 0 if a name has been given, not 0 for any other case.
+function setup_pulseaudio_input_name() {
+    local current="$1"
+    $DIALOG \
+        --backtitle "$BACKTITLE" \
+        --title "Setup" \
+        --inputbox \
+            "PulseAudio input name as it will be seen by the user" \
+            0 64 "$current" \
+        --output-fd 1
+}
+
+# @description Display a TUI allowing the user to set the PulseAudio output name
+# as it will appear to the user when an application asks to select a device.
+# @arg 1 current PulseAudio output name, if any
+# @stdout the PulseAudio output name
+# @exitcode 0 if a name has been given, not 0 for any other case.
+function setup_pulseaudio_output_name() {
+    local current="$1"
+    $DIALOG \
+        --backtitle "$BACKTITLE" \
+        --title "Setup" \
+        --inputbox \
+            "PulseAudio output name as it will be seen by the user"\
+            0 64 "$current" \
+        --output-fd 1
+}
+
+# @description Check if a Jalv LV2 preset is valid. An empty string is
+# considered a valid preset.
+# @arg 1 full path to the preset
+# @arg 2 identifier of the plugin which will use the preset
+# @exitcode 0 if the preset is valid, 2 or 3 if a file is missing, 4 if the
+# preset is not for the plugin.
+function is_valid_preset() {
+    local preset="$1"
+    local plugin="$2"
+
+    # No preset is a valid preset.
+    [ "$preset" == "" ] && return 0
+
+    # A preset must have state.ttl and manifest.ttl files.
+    [ -r "${preset}/state.ttl" ] || return 2
+    [ -r "${preset}/manifest.ttl" ] || return 3
+
+    # The manifest.ttl file must indicate the preset applies to a particular
+    # plugin.
+    grep --quiet "appliesTo.*${plugin}" "${preset}/manifest.ttl" || return 4
+
+    return 0
+}
+
+# @description Ask the user to enter a path to a preset.
+# @arg 1 full path to the current preset
+# @arg 2 identifier of the plugin which will use the preset
+# @arg 3 title to show above the input text box
+# @stdout the full path to the preset, or an empty string
+# @exitcode 0 if the preset is valid, not 0 for any other case.
+function ask_preset() {
+    local current="$1"
+    local plugin="$2"
+    local title="$3"
+
+    newpreset="$($DIALOG \
+        --backtitle "$BACKTITLE" \
+        --title "Setup" \
+        --inputbox "$title" 0 64 "$current" \
+        --output-fd 1 \
+    )"
+
+    if [ $? -eq 0 ]
+    then
+        printf "%s\n" "$newpreset"
+        is_valid_preset "$newpreset" "$plugin"
+    else
+        $DIALOG \
+            --backtitle "$BACKTITLE" \
+            --title "Setup" \
+            --msgbox "Invalid preset" 0 0 \
+            --output-fd 1
+
+        return 1
+    fi
+}
+
+# @description Ask the user for the equalizer preset path.
+# @arg 1 full path to the current preset
+# @stdout the full path to the preset, or an empty string
+# @exitcode 0 if the preset is valid, not 0 for any other case.
+function setup_eq10q_preset() {
+    local current="$1"
+    ask_preset "$current" "$EQPLUGIN" "Path to the EQ10Q preset"
+}
+
+# @description Ask the user for the noise reduction preset path.
+# @arg 1 full path to the current preset
+# @stdout the full path to the preset, or an empty string
+# @exitcode 0 if the preset is valid, not 0 for any other case.
+function setup_nr_preset() {
+    local current="$1"
+    ask_preset "$current" "$NRPLUGIN" "Path to the Noise Repellent preset"
+}
+
+# @description Create the setup file and its header.
+# @arg 1 full path to the setup file
+# @exitcode should always be 0.
+function create_setup_file() {
+    local fullpath="$1"
+
+    mkdir --parents -- "$(dirname "$fullpath")"
+    printf '# SETUP FILE GENERATED BY MICRO-EQUALIZER\n' > "$fullpath"
+    printf '# %s\n' "$(date --rfc-3339=second)" >> "$fullpath"
+}
+
+# @description Setup wizard asking the user for every possible parameter. The
+# user can cancel the procedure any time.
+# @noargs
+# @exitcode should always be 0.
+function setup_wizard() {
+    # Ask for the five parameters.
+    ALSACARD=$(select_alsa_card "$ALSACARD") || return
+    PULSEINPUTNAME=$(setup_pulseaudio_input_name "$PULSEINPUTNAME") || return
+    PULSEOUTPUTNAME=$(setup_pulseaudio_output_name "$PULSEOUTPUTNAME") || return
+    EQPRESET=$(setup_eq10q_preset "$EQPRESET") || return
+    NRPRESET=$(setup_nr_preset "$NRPRESET") || return
+
+    # Ask if everything is ok before saving.
+    $DIALOG \
+        --backtitle "$BACKTITLE" \
+        --title "Setup" \
+        --yesno "Do you want to save these settings?" 0 0
+
+    if [ $? -eq 0 ]
+    then
+        create_setup_file "$SETUPFILE"
+        printf 'ALSACARD=%q\n' "$ALSACARD" >> "$SETUPFILE"
+        printf 'PULSEINPUTNAME=%q\n' "$PULSEINPUTNAME" >> "$SETUPFILE"
+        printf 'PULSEOUTPUTNAME=%q\n' "$PULSEOUTPUTNAME" >> "$SETUPFILE"
+        printf 'EQPRESET=%q\n' "$EQPRESET" >> "$SETUPFILE"
+        printf 'NRPRESET=%q\n' "$NRPRESET" >> "$SETUPFILE"
+    fi
+}
+
+# @description Given the current setup, build the DSP that will equalize our
+# microphone.
+# @exitcode should be 0.
+function build_dsp() {
+    # Allow jackd to acquire the sound card though PulseAudio is running.
+    # Because pasuspender suspends PulseAudio while the program is still running
+    # we use a special parameter of this script in order to launch the jackd
+    # server and reenable PulseAudio. Once jackd got a hold of a device,
+    # PulseAudio will forget it.
+    pasuspender -- "$0" run-jack
+
+    # Create a bridge between PulseAudio and Jack for the microphone. The
+    # connect parameter is set to no to avoir duplication of sound when
+    # recording.
+    pactl \
+        load-module module-jack-source \
+        server_name="micro-equalizer" \
+        source_name="MECorrectedInput" \
+        client_name="MECorrectedInput" \
+        connect=no
+
+    pacmd \
+        update-source-proplist MECorrectedInput \
+        device.description="\"${PULSEINPUTNAME}\""
+
+    # Create a bridge between PulseAudio and Jack for the speakers associated
+    # with the microphone (headset).
+    pactl \
+        load-module module-jack-sink \
+        server_name="micro-equalizer" \
+        sink_name="MEOutput" \
+        client_name="MEOutput" \
+        connect=yes
+
+    pacmd \
+        update-sink-proplist MEOutput \
+        device.description="\"${PULSEOUTPUTNAME}\""
+
+    # Launch equalizer plugin, with or without a preset.
+    if [ "$EQPRESET" == "" ]
+    then
+        JACK_DEFAULT_SERVER=micro-equalizer \
+            jalv.gtk -s "$EQPLUGIN" &
+    else
+        JACK_DEFAULT_SERVER=micro-equalizer \
+            jalv.gtk -s -l "$EQPRESET" "$EQPLUGIN" &
+    fi
+
+    # Launch noise reduction plugin, with or without a preset.
+    if [ "$NRPRESET" == "" ]
+    then
+        JACK_DEFAULT_SERVER=micro-equalizer LANG= \
+            jalv.gtk -s "$NRPLUGIN" &
+    else
+        JACK_DEFAULT_SERVER=micro-equalizer LANG= \
+            jalv.gtk -s -l "$NRPRESET" "$NRPLUGIN" &
+    fi
+
+    sleep 2
+
+    # Connect the microphone to the equalizer input.
+    jack_connect \
+        --server micro-equalizer \
+        "system:capture_1" \
+        "EQ10Q Stereo:input1"
+
+    jack_connect \
+        --server micro-equalizer \
+         "system:capture_1" \
+         "EQ10Q Stereo:input2"
+
+    # Connect the equalizer output to the noise reduction input.
+    jack_connect \
+        --server micro-equalizer \
+         "EQ10Q Stereo:output1" \
+         "Noise repellent:input"
+
+    jack_connect \
+        --server micro-equalizer \
+         "EQ10Q Stereo:output2" \
+         "Noise repellent:input"
+
+    # Connect the noise reduction output to PulseAudio.
+    jack_connect \
+        --server micro-equalizer \
+         "Noise repellent:output" \
+         "MECorrectedInput:mono"
+
+    jack_connect \
+        --server micro-equalizer \
+         "Noise repellent:output" \
+         "MECorrectedInput:mono"
+
+    # Connect the headset speakers to PulseAudio.
+    jack_connect \
+        --server micro-equalizer \
+         "MEOutput:front-left" \
+         "system:playback_1"
+
+    jack_connect \
+        --server micro-equalizer \
+         "MEOutput:front-right" \
+         "system:playback_2"
+}
+
+# @description Run a jackd server instance named "micro-equalizer", thus the
+# instance may be killed without disturbing any other application. It waits 1
+# second after launching the server to allow it the time to acquire the
+# sound card.
+# @noargs
+# @exitcode should be 0.
+function run_jack() {
+    nohup jackd \
+        --no-realtime \
+        --name "micro-equalizer" \
+        -d alsa \
+        --device "hw:$ALSACARD" \
+        --rate 48000 \
+        > /dev/null \
+        &
+
+    sleep 1
+}
+
+# @description Kill any "micro-equalizer" Jackd server running instance.
+# Programs using this server are expected to end upon its disappearance.
+# @noargs
+# @exitcode should be 0.
+function kill_dsp() {
+    # Kill micro equalizer jackd server.
+    ps -C jackd --format pid,args \
+        | sed '/micro-equalizer/!d; s/^ *\([0-9]*\).*$/\1/g' \
+        | while read jackpid
+        do
+            kill -9 "$jackpid"
+        done
+}
+
+# @description Check if an LV2 plugin is installed and available.
+# @arg 1 the LV2 plugin identfiier.
+# @exitcode 0 if the LV2 plugin is installed, not 0 if it is not installed.
+function plugin_installed() {
+    local plugin="$1"
+    lv2ls | grep --quiet "^${plugin}$"
+}
+
+# @description Check if PulseAudio module is installed and available.
+# @arg 1 the PulseAudio module identfiier.
+# @exitcode 0 if the PulseAudio module is installed, not 0 if it is not
+# installed.
+function module_installed() {
+    local module="$1"
+    pacmd list-modules | grep --quiet "<${module}>"
+}
+
+# Check presence of command line programs used by this script.
+assert "${DIALOG} not found" which "$DIALOG" > /dev/null
+assert "arecord not found" which arecord > /dev/null
+assert "pulseaudio not found" which pulseaudio > /dev/null
+assert "pactl not found" which pactl > /dev/null
+assert "pacmd not found" which pacmd > /dev/null
+assert "pasuspender not found" which pasuspender > /dev/null
+assert "jackd not found" which jackd > /dev/null
+assert "jalv not found" which jalv > /dev/null
+assert "jalv.gtk not found" which jalv.gtk > /dev/null
+assert "jack_connect not found" which jack_connect > /dev/null
+
+# Check presence of PulseAudio modules used by this script.
+assert \
+    "module-jack-source module not installed" \
+    module_installed "module-jack-source"
+
+assert \
+    "module-jack-sink module not installed" \
+    module_installed "module-jack-sink"
+
+# Micro equalizer comes with x86_64 versions of the two LV2 plugin it uses.
+# If the current architecture is x86_64, then use them!
+[ $(uname -m) == "x86_64" ] && export LV2_PATH="${SCRIPTDIR}/lv2"
+
+# Check presence of LV2 plugins used by this script.
+assert "EQ10Q plugin not installed" plugin_installed "$EQPLUGIN"
+assert "Noise Repellent plugin not installed" plugin_installed "$NRPLUGIN"
+
+command="$1"
+shift
+case "$command" in
+    setup)
+        setup_wizard
+        ;;
+
+    run)
+        build_dsp
+        ;;
+
+    run-jack)
+        run_jack
+        ;;
+
+    kill)
+        kill_dsp
+        ;;
+
+    help-html)
+        show_help html
+        ;;
+
+    help-man)
+        show_help man
+        ;;
+
+    help-raw)
+        show_help raw
+        ;;
+
+    *)
+        show_help man | less --raw-control-chars
+        ;;
+esac

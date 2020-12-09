@@ -1,0 +1,180 @@
+@prefix lv2:  <http://lv2plug.in/ns/lv2core#>.
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix doap: <http://usefulinc.com/ns/doap#>.
+@prefix guiext: <http://lv2plug.in/ns/extensions/ui#>.
+@prefix units: <http://lv2plug.in/ns/extensions/units#> .
+@prefix pprop: <http://lv2plug.in/ns/ext/port-props#> .
+
+<http://eq10q.sourceforge.net/prafols#me>
+	a foaf:Person ;
+	foaf:name "Pere Ràfols Soler" ;
+	foaf:mbox <mailto:sapista2@gmail.com> ;
+	foaf:homepage <http://eq10q.sourceforge.net> .
+
+<http://eq10q.sourceforge.net/eq10qplugins>
+	a doap:Project ;
+	doap:maintainer <http://eq10q.sourceforge.net/prafols#me> ;
+	doap:name "EQ10Q plugins" .
+
+##LV2 GUI extension
+<http://eq10q.sourceforge.net/matrix_ms/gui>
+  a guiext:GtkUI;
+  guiext:binary <gui/matrix_ms_gui.so>;
+  lv2:optionalFeature guiext:noUserResize.
+
+##LV2 plugin binary
+<http://eq10q.sourceforge.net/matrix_ms2lr>
+  a lv2:Plugin, lv2:UtilityPlugin, doap:Project;
+  lv2:binary <matrix_ms2lr.so>;
+  doap:name "MS2LR";
+  doap:license <http://usefulinc.com/doap/licenses/gpl>;
+  lv2:optionalFeature lv2:hardRTCapable;
+  lv2:project <http://eq10q.sourceforge.net/eq10qplugins>;
+  guiext:ui <http://eq10q.sourceforge.net/matrix_ms/gui>;
+
+      lv2:port
+      [
+	      a lv2:AudioPort, lv2:InputPort;
+	      lv2:index 0;
+	      lv2:symbol "inputm";
+	      lv2:name "Input M";
+      ],
+      
+      [
+	      a lv2:AudioPort, lv2:InputPort;
+	      lv2:index 1;
+	      lv2:symbol "inputs";
+	      lv2:name "Input S";
+      ],
+      
+      [
+	      a lv2:AudioPort, lv2:OutputPort;
+	      lv2:index 2;
+	      lv2:symbol "outputl";
+	      lv2:name "Output L";
+      ],
+      
+      [
+	      a lv2:AudioPort, lv2:OutputPort;
+	      lv2:index 3;
+	      lv2:symbol "outputr";
+	      lv2:name "Output R";
+      ],
+
+      [
+	      a lv2:ControlPort, lv2:InputPort;
+	      lv2:index 4;
+	      lv2:symbol "ingainm";
+	      lv2:name "Gain M (dB)";
+	      lv2:minimum -20;
+	      lv2:maximum 20;
+	      lv2:default 0;
+	      units:unit units:db;
+      ],
+      
+      [
+	      a lv2:ControlPort, lv2:InputPort;
+	      lv2:index 5;
+	      lv2:symbol "ingains";
+	      lv2:name "Gain S (dB)";
+	      lv2:minimum -20;
+	      lv2:maximum 20;
+	      lv2:default 0;
+	      units:unit units:db;
+      ],
+      
+      [
+	      a lv2:ControlPort, lv2:InputPort;
+	      lv2:index 6;
+	      lv2:symbol "outgainl";
+	      lv2:name "Gain L (dB)";
+	      lv2:minimum -20;
+	      lv2:maximum 20;
+	      lv2:default 0;
+	      units:unit units:db;
+      ],
+      
+      [
+	      a lv2:ControlPort, lv2:InputPort;
+	      lv2:index 7;
+	      lv2:symbol "outgainr";
+	      lv2:name "Gain R (dB)";
+	      lv2:minimum -20;
+	      lv2:maximum 20;
+	      lv2:default 0;
+	      units:unit units:db;
+      ],
+      
+      [
+	      a lv2:ControlPort, lv2:InputPort;
+	      lv2:index 8;
+	      lv2:symbol "solom";
+	      lv2:name "Solo M";
+	      lv2:minimum 0;
+	      lv2:maximum 1;
+	      lv2:default 0;
+	      lv2:portProperty lv2:toggled;
+      ],
+      
+      [
+	      a lv2:ControlPort, lv2:InputPort;
+	      lv2:index 9;
+	      lv2:symbol "solos";
+	      lv2:name "Solo S";
+	      lv2:minimum 0;
+	      lv2:maximum 1;
+	      lv2:default 0;
+	      lv2:portProperty lv2:toggled;
+      ],
+      
+      [
+	      a lv2:ControlPort, lv2:InputPort;
+	      lv2:index 10;
+	      lv2:symbol "solol";
+	      lv2:name "Solo L";
+	      lv2:minimum 0;
+	      lv2:maximum 1;
+	      lv2:default 0;
+	      lv2:portProperty lv2:toggled;
+      ],
+
+      [
+	      a lv2:ControlPort, lv2:InputPort;
+	      lv2:index 11;
+	      lv2:symbol "solor";
+	      lv2:name "Solo R";
+	      lv2:minimum 0;
+	      lv2:maximum 1;
+	      lv2:default 0;
+	      lv2:portProperty lv2:toggled;
+      ],      
+      
+      
+      [
+	      a lv2:ControlPort, lv2:OutputPort;
+	      lv2:index 12;
+	      lv2:symbol "vu_inm";
+	      lv2:name "In VU M";
+      ],
+      
+      [
+	      a lv2:ControlPort, lv2:OutputPort;
+	      lv2:index 13;
+	      lv2:symbol "vu_ins";
+	      lv2:name "In VU S";
+      ],
+      
+      [
+	      a lv2:ControlPort, lv2:OutputPort;
+	      lv2:index 14;
+	      lv2:symbol "vu_outl";
+	      lv2:name "Out VU L";
+      ],
+      
+      [
+	      a lv2:ControlPort, lv2:OutputPort;
+	      lv2:index 15;
+	      lv2:symbol "vu_outr";
+	      lv2:name "Out VU R";
+      ].
+        
