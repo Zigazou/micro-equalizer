@@ -48,6 +48,7 @@ function assert() {
         echo "$date $script [$$]: $message (line=$line, rc=$rc)" >&2
         exit $rc
     }
+    exit $?
 }
 
 # @description Generate the help for this script in groff format.
@@ -334,10 +335,28 @@ function setup_wizard() {
     fi
 }
 
+# @description Determine if there is already an instance of micro-equalizer
+# running.
+# @noargs
+# @exitcode 0 if micro-equalizer is already running, not 0 otherwise.
+function is_micro_equalizer_not_running() {
+    local instancecount=$(\
+        ps -C jackd --format pid,args \
+            | sed '/micro-equalizer/!d; s/^ *\([0-9]*\).*$/\1/g' \
+            | wc --lines \
+    )
+
+    test "$instancecount" -eq 0
+}
+
 # @description Given the current setup, build the DSP that will equalize our
 # microphone.
 # @exitcode should be 0.
 function build_dsp() {
+    assert \
+        "An instance of micro-equalizer is already running" \
+        is_micro_equalizer_not_running
+
     # Allow jackd to acquire the sound card though PulseAudio is running.
     # Because pasuspender suspends PulseAudio while the program is still running
     # we use a special parameter of this script in order to launch the jackd
@@ -446,6 +465,10 @@ function build_dsp() {
 # @noargs
 # @exitcode should be 0.
 function run_jack() {
+    assert \
+        "An instance of micro-equalizer is already running" \
+        is_micro_equalizer_not_running
+
     nohup jackd \
         --no-realtime \
         --name "micro-equalizer" \
@@ -486,7 +509,8 @@ function plugin_installed() {
 # installed.
 function module_installed() {
     local module="$1"
-    pacmd list-modules | grep --quiet "<${module}>"
+    pacmd describe-module "$module" \
+        | grep --invert-match --quiet "Failed to open module"
 }
 
 # Check presence of command line programs used by this script.
