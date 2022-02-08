@@ -7,6 +7,9 @@
 # The dialog utility. Should work with gdialog.
 DIALOG=dialog
 
+# Find jalv.gtk
+JALV_GTK=$(command -v jalv.gtk) || JALV_GTK=$(command -v jalv.gtk3)
+
 # The back title (the name of this application).
 BACKTITLE="Micro Equalizer"
 
@@ -395,20 +398,20 @@ function build_dsp() {
     if [ "$EQPRESET" == "" ]
     then
         JACK_DEFAULT_SERVER=micro-equalizer \
-            jalv.gtk -s "$EQPLUGIN" &
+            $JALV_GTK -s "$EQPLUGIN" &
     else
         JACK_DEFAULT_SERVER=micro-equalizer \
-            jalv.gtk -s -l "$EQPRESET" "$EQPLUGIN" &
+            $JALV_GTK -s -l "$EQPRESET" "$EQPLUGIN" &
     fi
 
     # Launch noise reduction plugin, with or without a preset.
     if [ "$NRPRESET" == "" ]
     then
         JACK_DEFAULT_SERVER=micro-equalizer LANG= \
-            jalv.gtk -s "$NRPLUGIN" &
+            $JALV_GTK -s "$NRPLUGIN" &
     else
         JACK_DEFAULT_SERVER=micro-equalizer LANG= \
-            jalv.gtk -s -l "$NRPRESET" "$NRPLUGIN" &
+            $JALV_GTK -s -l "$NRPRESET" "$NRPLUGIN" &
     fi
 
     sleep 2
@@ -522,7 +525,7 @@ assert "pacmd not found" which pacmd > /dev/null
 assert "pasuspender not found" which pasuspender > /dev/null
 assert "jackd not found" which jackd > /dev/null
 assert "jalv not found" which jalv > /dev/null
-assert "jalv.gtk not found" which jalv.gtk > /dev/null
+assert "jalv.gtk not found" which "$JALV_GTK" > /dev/null
 assert "jack_connect not found" which jack_connect > /dev/null
 
 # Check presence of PulseAudio modules used by this script.
